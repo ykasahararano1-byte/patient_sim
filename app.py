@@ -63,10 +63,12 @@ audio_value = st.audio_input("🎤 マイクボタンを押して患者に話し
 # 音声入力があった場合の処理
 if audio_value:
     audio_bytes = audio_value.read()
+    # 音声データの形式（mime_type）を取得
+    audio_type = audio_value.type
     
     # ユーザー表示用メッセージ
     with st.chat_message("user"):
-        st.audio(audio_bytes, format="audio/wav")
+        st.audio(audio_bytes, format=audio_type) # 形式を動的に設定
         st.caption("※音声メッセージを送信しました")
     st.session_state.messages.append({"role": "user", "content": "🎙️ (音声入力)"})
 
@@ -75,7 +77,7 @@ if audio_value:
         try:
             # 音声データをGeminiへ直接送信
             audio_data = {
-                "mime_type": "audio/wav",
+                "mime_type": audio_type, # 形式を動的に設定
                 "data": audio_bytes
             }
             response = st.session_state.chat.send_message([audio_data, "この音声を聞いて患者として回答してください。"])
