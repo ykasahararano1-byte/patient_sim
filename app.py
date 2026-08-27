@@ -5,7 +5,7 @@ from io import BytesIO
 
 # === 画面の基本設定 ===
 st.set_page_config(page_title="患者シミュレーター", page_icon="🩺")
-st.title("🩺 患者シミュレーター (音声対話版)")
+st.title("🩺 信州さん")
 
 # === サイドバー（設定画面） ===
 with st.sidebar:
