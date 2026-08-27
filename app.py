@@ -21,8 +21,8 @@ with st.sidebar:
     
     st.divider()
     
-    st.subheader("📝 患者の基本設定")
-    default_prompt = """あなたは以下の設定を持つ患者として振る舞ってください。
+    # 患者の基本設定（画面には表示させず、裏側でAIに読み込ませる）
+    patient_setting = """あなたは以下の設定を持つ患者として振る舞ってください。
 学生の質問に対して、一般人の言葉遣いで答えてください。
 専門用語は使わず、聞かれたことだけに短く答えてください。
 
@@ -33,9 +33,7 @@ with st.sidebar:
 - 家族歴: 父親が心筋梗塞
 - 性格: 少し不安そうにしている。痛みの詳細を聞かれるまで自分からは多くを語らない。"""
     
-    patient_setting = st.text_area("プロンプト（設定）を編集", value=default_prompt, height=250)
-    
-    if st.button("🔄 設定を反映してチャットをリセット"):
+    if st.button("🔄 最初からやり直す（リセット）"):
         st.session_state.messages = []
         st.session_state.chat = None
         st.rerun()
