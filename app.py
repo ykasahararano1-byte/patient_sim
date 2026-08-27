@@ -9,7 +9,7 @@ st.title("🩺 信州さん")
 
 # === サイドバー（設定画面） ===
 with st.sidebar:
-   st.header("⚙️ 設定パネル")
+    st.header("⚙️ 設定パネル")
     
     # クラウドのSecretsにキーがあればそれを使い、なければ入力欄を表示
     if "GEMINI_API_KEY" in st.secrets:
