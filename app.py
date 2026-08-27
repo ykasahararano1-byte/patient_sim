@@ -9,10 +9,15 @@ st.title("🩺 患者シミュレーター (音声対話版)")
 
 # === サイドバー（設定画面） ===
 with st.sidebar:
-    st.header("⚙️ 設定パネル")
+   st.header("⚙️ 設定パネル")
     
-    api_key = st.text_input("Gemini APIキーを入力", type="password")
-    st.caption("※Google AI Studioで取得したAPIキーを入力してください。")
+    # クラウドのSecretsにキーがあればそれを使い、なければ入力欄を表示
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        st.success("✅ システムAPIキー接続済み")
+    else:
+        api_key = st.text_input("Gemini APIキーを入力", type="password")
+        st.caption("※Google AI Studioで取得したAPIキーを入力してください。")
     
     st.divider()
     
