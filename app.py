@@ -1,7 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
-from gtts import gTTS
-from io import BytesIO
+import edge_tts
+import asyncio
 
 # === 画面の基本設定 ===
 st.set_page_config(page_title="患者シミュレーター", page_icon="🩺")
@@ -90,11 +90,23 @@ if audio_value:
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
             
-            # 返答を音声合成して自動再生
-            tts = gTTS(text=response.text, lang='ja')
-            audio_fp = BytesIO()
-            tts.write_to_fp(audio_fp)
-            st.audio(audio_fp.getvalue(), format="audio/mp3", autoplay=True)
+            # 返答を音声合成して自動再生（男性の声：Keita）
+            async def make_audio():
+                communicate = edge_tts.Communicate(response.text, "ja-JP-KeitaNeural")
+                audio_data = b""
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        audio_data += chunk["data"]
+                return audio_data
+            
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            audio_bytes = loop.run_until_complete(make_audio())
+            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
