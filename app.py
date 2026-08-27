@@ -52,7 +52,7 @@ if "messages" not in st.session_state:
 
 if "chat" not in st.session_state or st.session_state.chat is None:
     model = genai.GenerativeModel(
-        "gemini-3.6-flash-latest", 
+        "gemini-3.6-flash", 
         system_instruction=patient_setting
     )
     st.session_state.chat = model.start_chat(history=[])
