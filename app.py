@@ -72,32 +72,60 @@ if "chat" not in st.session_state or st.session_state.chat is None:
     st.session_state.chat = model.start_chat(history=[])
 
 
-# === 音声入力エリア（元の位置、ボタンのみ巨大化） ===
+# === 音声入力エリア（マイクのみ巨大化、ゴミ箱等は小サイズ維持） ===
 st.markdown("""
 <style>
-    /* 録音ボタン（開始/停止）、送信ボタン */
-    /* st.audio_inputの中にある button 要素すべてを対象にする */
+    /* 全てのボタンを一旦巨大化（これがマイクボタンに適用される） */
     [data-testid="stAudioInput"] button {
-        width: 100px !important;  /* ボタンの幅を巨大化 */
-        height: 100px !important; /* ボタンの高さを巨大化 */
-        border-radius: 50% !important; /* 完全な円形に */
-        background-color: #ff4b4b !important; /* ボタンの色（赤） */
+        width: 100px !important;  
+        height: 100px !important; 
+        border-radius: 50% !important; 
+        background-color: #ff4b4b !important; 
         color: white !important;
         border: none !important;
         cursor: pointer !important;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-        margin: 0 10px !important; /* ボタン周りの余白 */
+        margin: 0 10px !important; 
     }
     
-    /* ボタンの中のアイコン（svg）を巨大化 */
+    /* マイクアイコンの巨大化 */
     [data-testid="stAudioInput"] button svg {
-        width: 50px !important;  /* アイコンの幅を巨大化 */
-        height: 50px !important; /* アイコンの高さを巨大化 */
+        width: 50px !important;  
+        height: 50px !important; 
     }
 
-    /* 波形表示のアニメーション部分（元のサイズのまま） */
+    /* 波形表示のアニメーション部分は元のサイズのまま */
     [data-testid="stAudioInput-waveforms"] {
         transform: scale(1.0) !important; 
+    }
+
+    /* === ⬇️ 今回の修正部分 ⬇️ === */
+    /* ダウンロード、ゴミ箱(クリア)、再生ボタンは「元の小さいサイズ・透明」に上書きして戻す */
+    [data-testid="stAudioInput"] button[aria-label*="Download" i],
+    [data-testid="stAudioInput"] button[aria-label*="Clear" i],
+    [data-testid="stAudioInput"] button[aria-label*="Play" i],
+    [data-testid="stAudioInput"] button[aria-label*="ダウンロード" i],
+    [data-testid="stAudioInput"] button[aria-label*="削除" i],
+    [data-testid="stAudioInput"] button[aria-label*="クリア" i],
+    [data-testid="stAudioInput"] button[aria-label*="再生" i] {
+        width: 40px !important;
+        height: 40px !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        color: inherit !important;
+        margin: 0 !important;
+    }
+
+    /* 小さいボタンの中のアイコンサイズも元に戻す */
+    [data-testid="stAudioInput"] button[aria-label*="Download" i] svg,
+    [data-testid="stAudioInput"] button[aria-label*="Clear" i] svg,
+    [data-testid="stAudioInput"] button[aria-label*="Play" i] svg,
+    [data-testid="stAudioInput"] button[aria-label*="ダウンロード" i] svg,
+    [data-testid="stAudioInput"] button[aria-label*="削除" i] svg,
+    [data-testid="stAudioInput"] button[aria-label*="クリア" i] svg,
+    [data-testid="stAudioInput"] button[aria-label*="再生" i] svg {
+        width: 20px !important;
+        height: 20px !important;
     }
 </style>
 """, unsafe_allow_html=True)
