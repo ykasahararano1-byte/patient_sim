@@ -70,7 +70,7 @@ if "messages" not in st.session_state:
 if "chat" not in st.session_state or st.session_state.chat is None:
     # モデル名を安定バージョンに戻します
     model = genai.GenerativeModel(
-        "gemini-1.5-flash", 
+        "gemini-3.6-flash", 
         system_instruction=patient_setting
     )
     st.session_state.chat = model.start_chat(history=[])
