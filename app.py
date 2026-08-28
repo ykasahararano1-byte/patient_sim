@@ -1,11 +1,13 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import google.generativeai as genai
 import edge_tts
 import asyncio
+import base64
 
 # === 画面の基本設定 ===
-st.set_page_config(page_title="患者シミュレーター", page_icon="🩺")
-st.title("🩺 信州さん")
+st.set_page_config(page_title="患者シミュレーター", page_icon="🩺", layout="wide")
+st.title("🩺 患者シミュレーター (長押しマイク版)")
 
 # === サイドバー（設定画面） ===
 with st.sidebar:
@@ -23,8 +25,9 @@ with st.sidebar:
     
     # 患者の基本設定（画面には表示させず、裏側でAIに読み込ませる）
     patient_setting = """あなたは以下の設定を持つ患者として振る舞ってください。
-学生の質問に対して、一般人の言葉遣いで答えてください。
-専門用語は使わず、聞かれたことだけに短く答えてください。
+学生の質問に対して、一般人の言葉遣いで答え、短く話してください。
+専門用語は使わず、聞かれたことだけに短く答してください。
+痛みや不安を表現するような声色（「うーん」などの間）を少し交えてください。
 
 【患者情報】
 - 氏名: 信州　俊彦（50歳代後半・男性）
@@ -65,62 +68,215 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "chat" not in st.session_state or st.session_state.chat is None:
+    # モデル名を安定バージョンに戻します
     model = genai.GenerativeModel(
-        "gemini-3.6-flash", 
+        "gemini-1.5-flash", 
         system_instruction=patient_setting
     )
     st.session_state.chat = model.start_chat(history=[])
 
 # === チャット画面の表示 ===
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# チャットメッセージを表示するコンテナを作成
+chat_container = st.container()
+with chat_container:
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+            # 音声データがあれば表示（自動再生されるので、再生ボタンは表示させない）
+            if "assistant" == msg["role"] and "audio" in msg:
+                # st.audio(msg["audio"], format="audio/mp3") # 自動再生するので非表示
+                pass
 
-# === 音声入力ウィジェット（トランシーバー型） ===
-audio_value = st.audio_input("🎤 マイクボタンを押して患者に話しかける")
+# === 長押しマイクコンポーネント（インライン実装） ===
 
-# 音声入力があった場合の処理
-if audio_value:
-    audio_bytes = audio_value.read()
-    # 音声データの形式（mime_type）を取得
-    audio_type = audio_value.type
+def ptt_mic_component():
+    # JavaScript, HTML, CSSをインラインで記述
+    component_code = """
+    <style>
+        #ptt-button {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 150px;
+            background-color: #ff4b4b;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 60px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+            -webkit-tap-highlight-color: transparent; /* モバイルでのタップハイライトを無効化 */
+            transition: background-color 0.2s;
+            z-index: 9999;
+        }
+        #ptt-button:active {
+            background-color: #b52b2b;
+        }
+        #status {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: rgba(0,0,0,0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: none;
+            z-index: 9998;
+        }
+    </style>
     
-    # ユーザー表示用メッセージ
-    with st.chat_message("user"):
-        st.audio(audio_bytes, format=audio_type) # 形式を動的に設定
-        st.caption("※音声メッセージを送信しました")
-    st.session_state.messages.append({"role": "user", "content": "🎙️ (音声入力)"})
+    <div id="status">録音中...</div>
+    <button id="ptt-button">🎤</button>
+    
+    <script>
+        // Streamlitとの通信用
+        function sendValue(value) {
+            Streamlit.setComponentValue(value);
+        }
 
-    # AI（患者）の応答を取得
-    with st.chat_message("assistant"):
-        try:
-            # 音声データをGeminiへ直接送信
-            audio_data = {
-                "mime_type": audio_type, # 形式を動的に設定
-                "data": audio_bytes
+        const button = document.getElementById('ptt-button');
+        const status = document.getElementById('status');
+        let mediaRecorder;
+        let audioChunks = [];
+
+        async function startRecording() {
+            try {
+                // MediaStream Recording APIを使用して音声を録音
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioChunks = []; // クリア
+
+                    // BlobをBase64に変換してPythonに送る
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        // データURLからBase64部分のみを抽出
+                        const base64Audio = reader.result.split(',')[1];
+                        sendValue(base64Audio);
+                    };
+                    
+                    // マイクの使用を停止
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                status.style.display = 'block';
+                console.log('Recording started');
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                status.innerText = 'マイクエラー';
+                status.style.display = 'block';
             }
-            response = st.session_state.chat.send_message([audio_data, "この音声を聞いて患者として回答してください。"])
-            
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-            
-            # 返答を音声合成して自動再生（男性の声：Keita）
-            async def make_audio():
-                communicate = edge_tts.Communicate(response.text, "ja-JP-KeitaNeural")
-                audio_data = b""
-                async for chunk in communicate.stream():
-                    if chunk["type"] == "audio":
-                        audio_data += chunk["data"]
-                return audio_data
-            
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            
-            audio_bytes = loop.run_until_complete(make_audio())
-            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
+        }
 
-        except Exception as e:
-            st.error(f"エラーが発生しました: {e}")
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                status.style.display = 'none';
+                console.log('Recording stopped');
+            }
+        }
+
+        // マウスイベント
+        button.addEventListener('mousedown', startRecording);
+        button.addEventListener('mouseup', stopRecording);
+        button.addEventListener('mouseleave', stopRecording); // ボタンから外れたら停止
+
+        // タッチイベント (モバイル向け)
+        button.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // デフォルトのスクロールなどを無効化
+            startRecording();
+        });
+        button.addEventListener('touchend', stopRecording);
+        
+        // コンポーネントが準備できたら Streamlit に通知。高さを確保。
+        Streamlit.setFrameHeight(180); 
+    </script>
+    """
+    
+    # コンポーネントを定義して呼び出す。
+    declare_ptt_mic = components.declare_component("ptt_mic", content=component_code)
+    # データを返させる。
+    return declare_ptt_mic(key="ptt_mic_instance")
+
+# === 音声入力処理ロジック ===
+
+# カスタムコンポーネントからデータ（Base64文字列）を受け取る
+base64_audio = ptt_mic_component()
+
+# データがあった場合の処理
+if base64_audio:
+    try:
+        # Base64をバイナリ（bytes）にデコード
+        audio_bytes = base64.b64decode(base64_audio)
+        
+        # ユーザー表示用メッセージ（音声データをそのまま履歴に保存）
+        st.session_state.messages.append({"role": "user", "content": "🎙️ (音声入力)"})
+        with chat_container:
+            with st.chat_message("user"):
+                st.audio(audio_bytes, format="audio/wav")
+                st.caption("※音声メッセージを送信しました")
+
+        # AI（患者）の応答を取得
+        with chat_container:
+            with st.chat_message("assistant"):
+                try:
+                    # 音声データをGeminiへ直接送信
+                    # (edge-ttsに切り替えたので、wavとして扱う)
+                    audio_data = {
+                        "mime_type": "audio/wav",
+                        "data": audio_bytes
+                    }
+                    response = st.session_state.chat.send_message([audio_data, "この音声を聞いて患者として短く回答してください。"])
+                    
+                    st.markdown(response.text)
+                    
+                    # 返答を音声合成して自動再生（男性の声：Keita）
+                    async def make_audio(text):
+                        communicate = edge_tts.Communicate(text, "ja-JP-KeitaNeural")
+                        audio_data = b""
+                        async for chunk in communicate.stream():
+                            if chunk["type"] == "audio":
+                                audio_data += chunk["data"]
+                        return audio_data
+                    
+                    try:
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    tts_audio_bytes = loop.run_until_complete(make_audio(response.text))
+                    
+                    # 履歴にも保存（表示用テキストと再生用音声）
+                    st.session_state.messages.append({"role": "assistant", "content": response.text, "audio": tts_audio_bytes})
+                    
+                    # 自動再生（表示はしない）
+                    st.audio(tts_audio_bytes, format="audio/mp3", autoplay=True)
+
+                except Exception as e:
+                    st.error(f"エラーが発生しました: {e}")
+                    st.session_state.messages.append({"role": "assistant", "content": f"エラーが発生しました: {e}"})
+
+    except Exception as e:
+        st.error(f"音声データの変換エラー: {e}")
+
+# === UIの微調整 ===
+# ボタンが画面下部に固定されるため、チャットコンテナと重ならないように下に余白を作る
+st.markdown('<div style="height: 180px;"></div>', unsafe_allow_html=True)
