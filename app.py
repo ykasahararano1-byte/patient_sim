@@ -4,7 +4,7 @@ import edge_tts
 import asyncio
 
 # === 画面の基本設定 ===
-st.set_page_config(page_title="患者シミュレーター", page_icon="🩺")
+st.set_page_config(page_title="患者シミュレーター", page_icon="🩺", layout="centered")
 st.title("🩺 患者シミュレーター")
 
 # === サイドバー（設定画面） ===
@@ -66,28 +66,94 @@ if "messages" not in st.session_state:
 
 if "chat" not in st.session_state or st.session_state.chat is None:
     model = genai.GenerativeModel(
-        "gemini-1.5-flash",
+        "gemini-3.6-flash",
         system_instruction=patient_setting
     )
     st.session_state.chat = model.start_chat(history=[])
 
-# === 音声入力エリア（画面上部に巨大化して配置） ===
-# CSSを使って標準のボタンを無理やり巨大化します
+# === チャット画面（履歴）の表示 ===
+# 音声入力ウィジェットが画面上部に固定されるため、チャット履歴は下部に表示
+st.divider()
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# === 音声入力エリア（画面下部に大きく固定） ===
+
+# CSSを使って、音声入力ウィジェットの内部にある「ボタン」だけを巨大化します
 st.markdown("""
 <style>
-    /* 音声入力ウィジェット全体 */
+    /* 音声入力ウィジェット全体（画面下部に固定） */
     [data-testid="stAudioInput"] {
-        transform: scale(1.8); /* 1.8倍に拡大 */
-        transform-origin: top center;
-        margin-bottom: 80px; /* 下に余白 */
+        position: fixed;
+        bottom: 0px;
+        left: 0;
+        right: 0;
+        background-color: white;
+        padding: 20px;
+        z-index: 999;
+        box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* ウィジェット内部のコンテナ */
+    [data-testid="stAudioInput"] > div {
+        width: 100%;
+        max-width: 800px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* 録音ボタン（開始/停止）、送信ボタン */
+    /* st.audio_inputの中にある button 要素すべてを対象にする */
+    [data-testid="stAudioInput"] button {
+        width: 120px !important;  /* ボタンの幅を巨大化 (標準は約40px) */
+        height: 120px !important; /* ボタンの高さを巨大化 */
+        border-radius: 50% !important; /* 完全な円形に */
+        background-color: #ff4b4b !important; /* ボタンの色（赤） */
+        color: white !important;
+        border: none !important;
+        cursor: pointer !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-right: 20px !important;
+    }
+    
+    /* ボタンの中のアイコン（svg）を巨大化 */
+    [data-testid="stAudioInput"] button svg {
+        width: 60px !important;  /* アイコンの幅を巨大化 */
+        height: 60px !important; /* アイコンの高さを巨大化 */
+    }
+
+    /* 波形表示のアニメーション部分（これを巨大化させない！） */
+    [data-testid="stAudioInput-waveforms"] {
+        transform: scale(1.0) !important; /* 元のサイズのままに保つ */
+        width: auto !important;
+        max-width: none !important;
+        flex-grow: 1 !important;
+        margin: 0 20px !important;
+    }
+    
+    /* タイマー部分 */
+    [data-testid="stAudioInput-timer"] {
+        font-size: 1.2rem !important; /* タイマーの文字も少し大きく */
+        margin-right: 20px !important;
+    }
+
+    /* コンポーネントが画面下部に固定されるため、チャット履歴と重ならないように下に余白を作る */
+    .stApp {
+        padding-bottom: 200px !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-st.divider()
-st.subheader("🎙️ ここを押して話しかけてください")
-
-# 標準の音声入力（これで画面中央にデカデカと表示されます）
+# 画面下部に固定された音声入力ウィジェット
+st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True) # 余白
 audio_file = st.audio_input("話しかける")
 
 if audio_file:
@@ -102,7 +168,7 @@ if audio_file:
                 "mime_type": mime_type,
                 "data": audio_file.read()
             }
-            response = st.session_state.chat.send_message([audio_data, "この音声を聞いて患者として短く回答してください。"])
+            response = st.session_state.chat.send_message([audio_data, "この音声を聞いて患者として短く回答してください。痛みや不安を表現するような声色（「うーん」などの間）を少し交えてください。"])
             st.markdown(response.text)
             
             # 返答を音声合成して自動再生（男性の声：Keita）
@@ -128,13 +194,9 @@ if audio_file:
             # 履歴にも保存
             st.session_state.messages.append({"role": "assistant", "content": response.text})
 
+            # 送信後、ウィジェットの状態をクリアするためにリロード（重要）
+            st.rerun()
+
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
             st.session_state.messages.append({"role": "assistant", "content": f"エラーが発生しました: {e}"})
-
-st.divider()
-
-# === チャット画面（履歴）の表示（音声入力の下に表示） ===
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
