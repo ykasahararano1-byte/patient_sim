@@ -210,9 +210,16 @@ def ptt_mic_component():
     </script>
     """
     
-    # コンポーネントを定義して呼び出す。
-    declare_ptt_mic = components.declare_component("ptt_mic", content=component_code)
-    # データを返させる。
+    import os
+    
+    # コンポーネント用のフォルダを作成してHTMLを書き出す
+    component_dir = "ptt_mic_component"
+    os.makedirs(component_dir, exist_ok=True)
+    with open(os.path.join(component_dir, "index.html"), "w", encoding="utf-8") as f:
+        f.write(component_code)
+    
+    # 保存したファイルを読み込んでコンポーネント化する
+    declare_ptt_mic = components.declare_component("ptt_mic", path=component_dir)
     return declare_ptt_mic(key="ptt_mic_instance")
 
 # === 音声入力処理ロジック ===
