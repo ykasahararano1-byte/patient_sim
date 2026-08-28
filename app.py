@@ -4,7 +4,7 @@ import edge_tts
 import asyncio
 
 # === 画面の基本設定 ===
-st.set_page_config(page_title="患者シミュレーター", page_icon="🩺", layout="centered")
+st.set_page_config(page_title="患者シミュレーター", page_icon="🩺")
 st.title("🩺 患者シミュレーター")
 
 # === サイドバー（設定画面） ===
@@ -71,89 +71,40 @@ if "chat" not in st.session_state or st.session_state.chat is None:
     )
     st.session_state.chat = model.start_chat(history=[])
 
-# === チャット画面（履歴）の表示 ===
-# 音声入力ウィジェットが画面上部に固定されるため、チャット履歴は下部に表示
-st.divider()
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
 
-# === 音声入力エリア（画面下部に大きく固定） ===
-
-# CSSを使って、音声入力ウィジェットの内部にある「ボタン」だけを巨大化します
+# === 音声入力エリア（元の位置、ボタンのみ巨大化） ===
 st.markdown("""
 <style>
-    /* 音声入力ウィジェット全体（画面下部に固定） */
-    [data-testid="stAudioInput"] {
-        position: fixed;
-        bottom: 0px;
-        left: 0;
-        right: 0;
-        background-color: white;
-        padding: 20px;
-        z-index: 999;
-        box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    /* ウィジェット内部のコンテナ */
-    [data-testid="stAudioInput"] > div {
-        width: 100%;
-        max-width: 800px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
     /* 録音ボタン（開始/停止）、送信ボタン */
     /* st.audio_inputの中にある button 要素すべてを対象にする */
     [data-testid="stAudioInput"] button {
-        width: 120px !important;  /* ボタンの幅を巨大化 (標準は約40px) */
-        height: 120px !important; /* ボタンの高さを巨大化 */
+        width: 100px !important;  /* ボタンの幅を巨大化 */
+        height: 100px !important; /* ボタンの高さを巨大化 */
         border-radius: 50% !important; /* 完全な円形に */
         background-color: #ff4b4b !important; /* ボタンの色（赤） */
         color: white !important;
         border: none !important;
         cursor: pointer !important;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        margin-right: 20px !important;
+        margin: 0 10px !important; /* ボタン周りの余白 */
     }
     
     /* ボタンの中のアイコン（svg）を巨大化 */
     [data-testid="stAudioInput"] button svg {
-        width: 60px !important;  /* アイコンの幅を巨大化 */
-        height: 60px !important; /* アイコンの高さを巨大化 */
+        width: 50px !important;  /* アイコンの幅を巨大化 */
+        height: 50px !important; /* アイコンの高さを巨大化 */
     }
 
-    /* 波形表示のアニメーション部分（これを巨大化させない！） */
+    /* 波形表示のアニメーション部分（元のサイズのまま） */
     [data-testid="stAudioInput-waveforms"] {
-        transform: scale(1.0) !important; /* 元のサイズのままに保つ */
-        width: auto !important;
-        max-width: none !important;
-        flex-grow: 1 !important;
-        margin: 0 20px !important;
-    }
-    
-    /* タイマー部分 */
-    [data-testid="stAudioInput-timer"] {
-        font-size: 1.2rem !important; /* タイマーの文字も少し大きく */
-        margin-right: 20px !important;
-    }
-
-    /* コンポーネントが画面下部に固定されるため、チャット履歴と重ならないように下に余白を作る */
-    .stApp {
-        padding-bottom: 200px !important;
+        transform: scale(1.0) !important; 
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 画面下部に固定された音声入力ウィジェット
-st.markdown("<div style='height: 100px;'></div>", unsafe_allow_html=True) # 余白
+st.divider()
+st.subheader("🎙️ ここを押して話しかけてください")
+
 audio_file = st.audio_input("話しかける")
 
 if audio_file:
@@ -194,9 +145,16 @@ if audio_file:
             # 履歴にも保存
             st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-            # 送信後、ウィジェットの状態をクリアするためにリロード（重要）
+            # 送信後、ウィジェットの状態をクリアするためにリロード
             st.rerun()
 
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
             st.session_state.messages.append({"role": "assistant", "content": f"エラーが発生しました: {e}"})
+
+st.divider()
+
+# === チャット画面（履歴）の表示（音声入力の下に表示） ===
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
